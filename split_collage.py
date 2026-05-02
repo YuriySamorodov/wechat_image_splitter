@@ -120,25 +120,75 @@ def split_edges(positions: list[int], length: int) -> list[tuple[int, int]]:
     return ranges
 
 
+def trim_side_bars(arr: np.ndarray, color: np.ndarray, tolerance: int) -> tuple[np.ndarray, int]:
+    height, width, _ = arr.shape
+    mask = np.all(np.abs(arr.astype(np.int16) - color) <= tolerance, axis=2)
+    col_fraction = mask.mean(axis=0)
+    min_fraction = 0.99
+
+    left = 0
+    while left < width and col_fraction[left] >= min_fraction:
+        left += 1
+
+    right = width
+    while right > left and col_fraction[right - 1] >= min_fraction:
+        right -= 1
+
+    if left == 0 and right == width:
+        return arr, 0
+
+    return arr[:, left:right, :], left
+
+
+def trim_crop_sides(crop: Image.Image, tolerance: int = 4, min_fraction: float = 0.99, max_border: int = 40) -> Image.Image:
+    arr = np.asarray(crop).astype(np.int16)
+    height, width, _ = arr.shape
+
+    left = 0
+    while left < min(width, max_border):
+        col = arr[:, left, :]
+        mean_color = np.round(col.mean(axis=0)).astype(np.int16)
+        if np.mean(np.all(np.abs(col - mean_color) <= tolerance, axis=1)) >= min_fraction:
+            left += 1
+        else:
+            break
+
+    right = width
+    while right > left and width - right < max_border:
+        col = arr[:, right - 1, :]
+        mean_color = np.round(col.mean(axis=0)).astype(np.int16)
+        if np.mean(np.all(np.abs(col - mean_color) <= tolerance, axis=1)) >= min_fraction:
+            right -= 1
+        else:
+            break
+
+    if left == 0 and right == width:
+        return crop
+
+    return crop.crop((left, 0, right, height))
+
+
 def crop_regions(image: Image.Image, bar_color: tuple[int, int, int] | None, tolerance: int) -> list[Image.Image]:
     arr = np.asarray(image)
     if bar_color is None:
         bar_color, tolerance = detect_bar_color(image, tolerance)
 
     color = np.array(bar_color, dtype=np.int16)
-    mask = np.all(np.abs(arr.astype(np.int16) - color) <= tolerance, axis=2)
+    trimmed_arr, x_offset = trim_side_bars(arr, color, tolerance)
+    mask = np.all(np.abs(trimmed_arr.astype(np.int16) - color) <= tolerance, axis=2)
 
     horiz_positions = find_separator_positions(mask, axis=0)
     vert_positions = find_separator_positions(mask, axis=1)
 
-    horiz_ranges = split_edges(horiz_positions, arr.shape[0])
-    vert_ranges = split_edges(vert_positions, arr.shape[1])
+    horiz_ranges = split_edges(horiz_positions, trimmed_arr.shape[0])
+    vert_ranges = split_edges(vert_positions, trimmed_arr.shape[1])
 
     crops: list[Image.Image] = []
     for y0, y1 in horiz_ranges:
         for x0, x1 in vert_ranges:
             if y1 > y0 and x1 > x0:
-                crop = image.crop((x0, y0, x1, y1))
+                crop = image.crop((x0 + x_offset, y0, x1 + x_offset, y1))
+                crop = trim_crop_sides(crop, tolerance=tolerance)
                 if crop.width > 0 and crop.height > 0:
                     crops.append(crop)
     return crops

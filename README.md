@@ -2,11 +2,12 @@
 
 A small Python tool for splitting WeChat screenshot collages into individual image tiles using visible separator bars.
 
-This tool is intended for images exported from WeChat, where the collage is separated by narrow horizontal and vertical lines. It automatically detects separator color and saves unique cropped images.
+This tool is intended for images exported from WeChat, where the collage is separated by narrow horizontal and vertical lines. It automatically detects separator color, removes left/right theme bars, and saves unique cropped images.
 
 ## Features
 
 - Detects separator bars automatically when `--bar-color` is not provided
+- Removes left/right theme bars from WeChat screenshots before cropping
 - Splits both horizontal and vertical separators into individual crop regions
 - Removes duplicate crops by content hash
 - Allows skipping small/thin crops using configurable size thresholds
@@ -39,7 +40,7 @@ python wechat_image_splitter/split_collage.py <input-path> --output <output-fold
 
 ### Example
 
-Split the WeChat collage images `IMG_2387.JPG` and `IMG_2389.JPG` into separate folders, skipping small crops:
+Split the WeChat collage image `IMG_2387.JPG` into a folder, skipping small crops:
 
 ```bash
 python wechat_image_splitter/split_collage.py/IMG_2387.JPG \
@@ -48,6 +49,8 @@ python wechat_image_splitter/split_collage.py/IMG_2387.JPG \
   --min-height 300 \
   --thin-action skip
 ```
+
+Split the WeChat collage image `IMG_2389.JPG` into a folder, skipping small crops:
 
 ```bash
 python wechat_image_splitter/split_collage.py/IMG_2389.JPG \
